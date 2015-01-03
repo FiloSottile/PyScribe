@@ -1,12 +1,6 @@
 import ast
 import re
 
-def draw_line(unit="-"):
-    output = ""
-    for _ in xrange(40):
-        output += unit
-    return output + "\\n"
-
 def get_indentation(line):
     return line[:len(line)-len(line.lstrip())]
 
@@ -40,7 +34,8 @@ def get_filtered_labels(line, program_ast):
     if len(node.value.keywords) > 0 and node.value.keywords[0].arg == 'filtered':
         for label in node.value.keywords[0].value.elts:
             filtered_labels.append(label.s)
-    return filtered_labels
+        return filtered_labels
+    return None
 
 def get_id_and_type(line, program_ast):
     variable_id = get_variable_id(line, program_ast)
@@ -70,17 +65,17 @@ def lines_variable_changed(variable_id, program_file):
 def get_timestamp(indentation):
     timestamp = (indentation +
                  "pyscribe_log.write('" +
-                 draw_line(unit="%") +
+                 "%"*40 + r'\n' +
                  "Log saved at ' + str(datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')) + '\\n" +
-                 draw_line(unit="%") +
+                 "%"*40 + r'\n' +
                  "\\n')\n")
     return timestamp
 
 def get_end(indentation):
     end = (indentation +
            "pyscribe_log.write('\\n" +
-           draw_line(unit="%") +
+           "%"*40 + r'\n' +
            "End of log\\n" +
-           draw_line(unit="%") +
+           "%"*40 + r'\n' +
            "')\n")
     return end

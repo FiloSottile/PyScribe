@@ -88,7 +88,7 @@ class Runner(object):
         self.api_calls = ['p', 'watch', 'iterscribe', 'd', 'Scriber']
         self.imports = ['re', 'datetime']
         self.desugared_lines = []
-        self.filtered_labels = []
+        self.filtered_labels = None
         self.watcher = Watcher()
 
     def gen_line_mapping(self, program_file):
@@ -200,17 +200,26 @@ class Runner(object):
 
     def from_line(self, line_num):
         if self.show_line_num:
-            return "From line " + str(line_num+1) + ": "
-        return ""
+            return """
+                'From line %d: '
+            """.strip() % (line_num+1)
+        return "''"
 
-    def action_and_ending(self, line_num):
+    def action_and_ending(self):
         if self.save_logs:
-            action = "pyscribe_log.write('"
-            ending = "+ '\\n')\n"
+            action = "pyscribe_log.write("
+            ending = " + '\\n')\n"
         else:
-            action = "print('"
+            action = "print("
             ending = ")\n"
         return action, ending
+
+    def make_line(self, indentation, line_num, desugared):
+        action, ending = self.action_and_ending()
+        from_line = ''
+        if line_num is not None:
+            from_line = self.from_line(line_num) + ' + '
+        return indentation + action + from_line + desugared + ending
 
     def desugar_line(self, line, line_num, program_file, program_ast):
         indentation = utils.get_indentation(line)
@@ -233,34 +242,19 @@ class Runner(object):
         if not desugared_line:
             return ""
 
-        action, ending = self.action_and_ending(line_num)
-        output = action + self.from_line(line_num) + desugared_line + ending
-
-        if len(indentation) > 0:
-            output = indentation + output
-        return output
+        return self.make_line(indentation, line_num, desugared_line)
 
     def distinguish(self, line, program_ast):
         unit = utils.get_distinguish_unit(line, program_ast)
-        return ("\\n" +
-                utils.draw_line(unit=unit) +
-                self.scribe(line, program_ast) +
-                " + '\\n" +
-                utils.draw_line(unit=unit) +
-                "'")
+        return r"""
+            '\n%s\n' + %s + '\n%s\n'
+        """.strip() % (unit*40, self.scribe(line, program_ast), unit*40)
 
     def iter_start(self, node, line, line_num, program_ast, indentation):
-        action, ending = self.action_and_ending(line_num)
-        text = ("' + '" +
-                self.scribe(line, program_ast) +
-                " + ' at beginning of for loop at line " +
-                str(node.lineno) +
-                "' ")
-        return (indentation[:-4] +
-                action +
-                utils.draw_line() +
-                text +
-                ending)
+        desugared = r"""
+            '%s\n' + %s + ' at beginning of for loop at line %s'
+        """.strip() % ('-'*40, self.scribe(line, program_ast), node.lineno)
+        return self.make_line(indentation[:-4], None, desugared)
 
     def offset(self):
         # TODO: I think this is dependent of import lines. Should not hardcode
@@ -286,13 +280,9 @@ class Runner(object):
                 self.desugared_lines.insert(line_number,
                                             indentation[:-4] + iterator_index + " = -1\n")
                 self.desugared_lines.append(iterator_update)
-                output = ("In iteration ' + str(" +
-                          iterator_index +
-                          ") + ', " +
-                          variable_id +
-                          " changed to ' + str(" +
-                          variable_id +
-                          ") ")
+                output = """
+                    'In iteration ' + str(%s) + ', %s changed to ' + str(%s)
+                """.strip() % (iterator_index, variable_id, variable_id)
                 return output
         raise KeyError("Could not find for loop")
 
@@ -302,26 +292,26 @@ class Runner(object):
         """
         variable_id, variable_type = utils.get_id_and_type(line, program_ast)
         label = utils.get_label(line, program_ast)
-        output = (variable_id +
-                  " is the ' + " +
-                  variable_type +
-                  " + ' ' + str(" +
-                  variable_id +
-                  ")")
-        if len(self.filtered_labels) > 0:
+        if self.filtered_labels is not None:
             if not label or label not in self.filtered_labels:
-                return ""
+                return None
+
+        output = """
+            '%s is the ' + %s + ' ' + str(%s)
+        """.strip() % (variable_id, variable_type, variable_id)
         if label:
-            output += (" + ' (" + label + ")'")
+            output += """
+                + ' (%s)'
+            """.strip() % label
         return output
 
     def variable_change(self, variable_id, line_num, indentation):
         """A helper method for watch that handles each line that watch
         identifies as a variable change"""
-        desugared = variable_id + " changed to ' + str(" + variable_id + ")"
-        action, ending = self.action_and_ending(line_num)
-        output = indentation + action + self.from_line(line_num) + desugared + ending
-        return output
+        desugared = """
+            '%s changed to ' + str(%s)
+        """.strip() % (variable_id, variable_id)
+        return self.make_line(indentation, line_num, desugared)
 
     def watch(self, line, line_num, program_file, program_ast):
         variable_id, variable_type = utils.get_id_and_type(line, program_ast)
@@ -329,12 +319,9 @@ class Runner(object):
         lines = filter(lambda x: x > line_num,
                        utils.lines_variable_changed(variable_id, program_file))
         self.watcher.set_lines(variable_id, lines)
-        return ("Watching variable " +
-                variable_id +
-                ", currently ' + " +
-                variable_type +
-                " + ' ' + str(" +
-                variable_id + ")")
+        return """
+            'Watching variable %s, currently ' + %s + ' ' + str(%s)
+        """.strip() % (variable_id, variable_type, variable_id)
 
 def python_file_type(string):
     if not string.endswith(".py"):
