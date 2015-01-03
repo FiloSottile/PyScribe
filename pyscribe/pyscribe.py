@@ -26,13 +26,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
 
 import argparse
-import uuid
 import random
 import string
 import os
 import ast
-import re
-import inspect
 import subprocess
 
 from . import utils
@@ -89,7 +86,7 @@ class Runner(object):
         self.initialized = False
         # p for print, d for distinguish
         self.api_calls = ['p', 'watch', 'iterscribe', 'd', 'Scriber']
-        self.imports = ['re', 'pprint', 'datetime']
+        self.imports = ['re', 'datetime']
         self.desugared_lines = []
         self.filtered_labels = []
         self.watcher = Watcher()
@@ -102,7 +99,6 @@ class Runner(object):
         program = open(program_file, 'r')
 
         for line_num, line_content in enumerate(program.readlines()):
-            is_api_call = False
             for func in self.api_calls:
                 if ("." + func + "(") in line_content:
                     # line num in most text editors is 1-indexed
