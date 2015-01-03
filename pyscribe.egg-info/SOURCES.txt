@@ -1,6 +1,7 @@
 setup.cfg
 setup.py
 pyscribe/__init__.py
+pyscribe/__main__.py
 pyscribe/pyscribe.py
 pyscribe/utils.py
 pyscribe.egg-info/PKG-INFO

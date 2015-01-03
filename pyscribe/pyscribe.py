@@ -29,15 +29,13 @@ import argparse
 import uuid
 import random
 import string
-import sys
 import os
 import ast
 import re
 import inspect
 import subprocess
 
-sys.path.append('.')
-import utils
+from . import utils
 
 class Scriber(object):
     def __init__(self, filtered=[]):
